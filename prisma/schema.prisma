@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+// Оновлена модель користувача
+model User {
+  id                 Int            @id @default(autoincrement())
+  email              String         @unique
+  password           String
+  name               String
+  role               Role           @default(USER)
+  avatar             String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  
+  resetToken         String?
+  resetTokenExpiry   DateTime?
+  twoFactorSecret    String?
+  is2FAEnabled       Boolean        @default(false)
+
+  // Додаємо зв'язок зі сповіщеннями
+  notifications      Notification[]
+
+  projects           Project[]
+  tasks              Task[]
+  comments           Comment[]
+  files              File[]
+  refreshTokens      RefreshToken[]
+
+  // Оптимізація БД
+  @@index([email])
+}
+
+// Оновлена модель файлу
+model File {
+  id           Int      @id @default(autoincrement())
+  filename     String
+  originalName String
+  mimetype     String
+  size         Int
+  path         String
+  uploadedBy   Int
+  createdAt    DateTime @default(now())
+  
+  user         User     @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+  
+  taskId       Int?
+  task         Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([uploadedBy])
+}
+
+// Модель для Refresh токенів
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  tokenHash String   @unique
+  userId    Int
+  expiresAt DateTime
+  revokedAt DateTime?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+}
+
+// Сутності 
+model Project {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  users       User[]
+  tasks       Task[]
+}
+
+model Task {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  status      String    @default("TODO")
+  
+  projectId   Int?
+  project     Project?  @relation(fields: [projectId], references: [id])
+  
+  assigneeId  Int?
+  assignee    User?     @relation(fields: [assigneeId], references: [id])
+
+  // Зворотні зв'язки для файлів та коментарів
+  files       File[]
+  comments    Comment[]
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Оптимізація БД
+  @@index([status])
+  @@index([projectId])
+  @@index([assigneeId])
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  text      String
+  createdAt DateTime @default(now())
+  taskId    Int
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id          Int      @id @default(autoincrement())
+  text        String
+  type        String   @default("INFO") // INFO, URGENT, SUCCESS
+  isRead      Boolean  @default(false)
+  
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+
+  // Індекс для швидкого завантаження непрочитаних сповіщень користувача
+  @@index([userId, isRead])
+}

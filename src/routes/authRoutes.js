@@ -53,7 +53,7 @@ router.post('/register', register);
  *       200: { description: Успішний вхід, повертає токени та дані користувача }
  *       400: { description: Не передано email або пароль }
  *       401: { description: Невірний email, пароль або код 2FA }
- *       403: { description: Вимагається код 2FA (повертає require2FA: true) }
+ *       403: { description: "Вимагається код 2FA (повертає require2FA: true)" }
  */
 router.post('/login', login);
 

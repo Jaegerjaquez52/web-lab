@@ -31,15 +31,17 @@ model User {
 
   // Додаємо зв'язок зі сповіщеннями
   notifications      Notification[]
+  activityLogs       ActivityLog[]
 
-  projects           Project[]
+  ownedProjects      Project[] @relation("ProjectOwner")
+  projects           Project[] @relation("ProjectMembers")
   tasks              Task[]
   comments           Comment[]
   files              File[]
   refreshTokens      RefreshToken[]
 
-  // Оптимізація БД
   @@index([email])
+  @@index([role])
 }
 
 // Оновлена модель файлу
@@ -59,6 +61,7 @@ model File {
   task         Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([uploadedBy])
+  @@index([taskId])
 }
 
 // Модель для Refresh токенів
@@ -79,8 +82,14 @@ model Project {
   name        String
   description String?
   createdAt   DateTime @default(now())
-  users       User[]
+  updatedAt   DateTime @updatedAt
+  ownerId     Int?
+  owner       User?    @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  members     User[]   @relation("ProjectMembers")
   tasks       Task[]
+
+  @@index([ownerId])
+  @@index([name])
 }
 
 model Task {
@@ -116,12 +125,16 @@ model Comment {
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   userId    Int
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([userId])
 }
 
 model Notification {
   id          Int      @id @default(autoincrement())
   text        String
-  type        String   @default("INFO") // INFO, URGENT, SUCCESS
+  type        String   @default("INFO")
+  priority    String   @default("NORMAL")
   isRead      Boolean  @default(false)
   
   userId      Int
@@ -131,4 +144,29 @@ model Notification {
 
   // Індекс для швидкого завантаження непрочитаних сповіщень користувача
   @@index([userId, isRead])
+  @@index([userId, priority])
+}
+
+model ActivityLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  action    String
+  entity    String
+  entityId  Int?
+  meta      String?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([entity, entityId])
+}
+
+model RealtimeEvent {
+  id        Int      @id @default(autoincrement())
+  room      String
+  event     String
+  payload   String
+  createdAt DateTime @default(now())
+
+  @@index([room, id])
 }

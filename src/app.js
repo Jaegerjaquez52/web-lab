@@ -10,6 +10,7 @@ import fileRoutes from './routes/fileRoutes.js';
 import taskRoutes from './routes/taskRoutes.js'; 
 import notificationRoutes from './routes/notificationRoutes.js';
 import commentRoutes from './routes/commentRoutes.js';
+import userRoutes from './routes/userRoutes.js';
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.use('/api/files', fileRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/comments', commentRoutes);
+app.use('/api/users', userRoutes);
 
 // Централізована обробка помилок
 app.use((err, req, res, next) => {
@@ -61,5 +63,7 @@ app.use((err, req, res, next) => {
 
   res.status(status).json({ error: status >= 500 ? 'Внутрішня помилка сервера' : err.message });
 });
+
+
 
 export default app;

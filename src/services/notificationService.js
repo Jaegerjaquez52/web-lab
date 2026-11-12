@@ -1,16 +1,21 @@
 import { prisma } from '../db.js';
+import { publish } from './realtimeService.js';
 
-// Створення та розсилка нового сповіщення
-export async function createNotification(io, userId, text, type = 'INFO') {
-  // Збереження сповіщення у базі даних
+export async function createNotification(io, userId, text, type = 'INFO', priority = 'NORMAL') {
   const notification = await prisma.notification.create({
-    data: { userId, text, type }
+    data: { userId, text, type, priority },
   });
 
-  // Миттєва доставка користувачу через WebSocket у персональну кімнату
-  if (io) {
-    io.to(`user:${userId}`).emit('notification', notification);
-  }
-
+  await publish(io, `user:${userId}`, 'notification', notification);
   return notification;
+}
+
+export async function createNotificationBatch(io, items) {
+  const created = [];
+  for (const item of items) {
+    created.push(
+      await createNotification(io, item.userId, item.text, item.type ?? 'INFO', item.priority ?? 'NORMAL')
+    );
+  }
+  return created;
 }

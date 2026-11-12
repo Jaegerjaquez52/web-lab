@@ -1,6 +1,7 @@
-const express = require('express');
+import express from 'express';
+import * as UserController from '../controllers/userController.js';
+
 const router = express.Router();
-const UserController = require('../controllers/userController');
 
 // Створення нового користувача
 router.post('/', UserController.createUser);
@@ -17,4 +18,4 @@ router.put('/:id', UserController.updateUser);
 // Видалення користувача з системи
 router.delete('/:id', UserController.deleteUser);
 
-module.exports = router;
+export default router;

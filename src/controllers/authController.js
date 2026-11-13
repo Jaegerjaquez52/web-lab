@@ -36,7 +36,8 @@ async function issueTokens(user) {
 export async function register(req, res) {
   const { email, password, name } = req.body ?? {};
 
-  if (!email || !password || !name) {
+  if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+      typeof password !== 'string' || typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: "Email, пароль та ім'я є обов'язковими" });
   }
 
@@ -44,14 +45,15 @@ export async function register(req, res) {
     return res.status(400).json({ error: 'Пароль має містити мінімум 8 символів' });
   }
 
-  const existingUser = await prisma.user.findUnique({ where: { email } });
+  const normalizedEmail = email.trim().toLowerCase();
+  const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
 
   if (existingUser) {
     return res.status(409).json({ error: 'Користувач з таким email вже існує' });
   }
 
   const user = await prisma.user.create({
-    data: { email, password: await hashPassword(password), name },
+    data: { email: normalizedEmail, password: await hashPassword(password), name: name.trim() },
     select: { id: true, email: true, name: true, role: true, createdAt: true },
   });
 
@@ -65,11 +67,11 @@ export async function register(req, res) {
 export async function login(req, res) {
   const { email, password, twoFactorToken } = req.body ?? {};
 
-  if (!email || !password) {
+  if (typeof email !== 'string' || typeof password !== 'string') {
     return res.status(400).json({ error: "Email та пароль є обов'язковими" });
   }
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
 
   if (!user || !(await comparePassword(password, user.password))) {
     return res.status(401).json({ error: 'Невірний email або пароль' });
@@ -84,7 +86,7 @@ export async function login(req, res) {
       });
     }
     
-    const isValidToken = authenticator.verify({ token: twoFactorToken, secret: user.twoFactorSecret });
+    const isValidToken = typeof twoFactorToken === 'string' && authenticator.verify({ token: twoFactorToken, secret: user.twoFactorSecret });
     if (!isValidToken) {
       return res.status(401).json({ error: 'Невірний код 2FA' });
     }
@@ -118,7 +120,7 @@ export async function refresh(req, res) {
   });
 
   // Захист від крадіжки: якщо токен вже відкликано, блокуємо всі токени користувача
-  if (!stored || stored.revokedAt) {
+  if (!stored || stored.revokedAt || stored.expiresAt <= new Date()) {
     if (stored) {
       await prisma.refreshToken.updateMany({
         where: { userId: stored.userId, revokedAt: null },
@@ -153,10 +155,12 @@ export async function logout(req, res) {
 // --- Відновлення паролю ---
 
 export async function forgotPassword(req, res) {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ error: 'Email є обов\'язковим' });
+  const { email } = req.body ?? {};
+  if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Вкажіть коректний email' });
+  }
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
   
   // Завжди повертаємо успіх для захисту від перебору email-адрес
   if (!user) {
@@ -177,7 +181,7 @@ export async function forgotPassword(req, res) {
 }
 
 export async function resetPassword(req, res) {
-  const { token, newPassword } = req.body;
+  const { token, newPassword } = req.body ?? {};
   
   if (!token || !newPassword || newPassword.length < 8) {
     return res.status(400).json({ error: 'Невірні дані або пароль коротший за 8 символів' });
@@ -202,8 +206,29 @@ export async function resetPassword(req, res) {
       resetTokenExpiry: null,
     },
   });
+  await prisma.refreshToken.updateMany({
+    where: { userId: user.id, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
 
   res.json({ message: 'Пароль успішно змінено' });
+}
+
+export async function changePassword(req, res) {
+  const { currentPassword, newPassword } = req.body ?? {};
+  if (typeof currentPassword !== 'string' || typeof newPassword !== 'string' || newPassword.length < 8) {
+    return res.status(400).json({ error: 'Поточний пароль та новий пароль мінімум з 8 символів є обов’язковими' });
+  }
+  const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+  if (!user || !(await comparePassword(currentPassword, user.password))) {
+    return res.status(401).json({ error: 'Поточний пароль неправильний' });
+  }
+  await prisma.user.update({ where: { id: user.id }, data: { password: await hashPassword(newPassword) } });
+  await prisma.refreshToken.updateMany({
+    where: { userId: user.id, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+  res.json({ message: 'Пароль змінено. Увійдіть знову.' });
 }
 
 // --- Двофакторна аутентифікація (2FA) ---
@@ -211,6 +236,7 @@ export async function resetPassword(req, res) {
 export async function generate2FA(req, res) {
   const secret = authenticator.generateSecret();
   const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+  if (!user) return res.status(404).json({ error: 'Користувача не знайдено' });
 
   const otpauthUrl = authenticator.keyuri(user.email, 'Task Manager API', secret);
   const qrCodeDataUrl = await qrcode.toDataURL(otpauthUrl);
@@ -229,10 +255,11 @@ export async function generate2FA(req, res) {
 }
 
 export async function verify2FA(req, res) {
-  const { token } = req.body;
-  if (!token) return res.status(400).json({ error: 'Потрібно надати код' });
+  const { token } = req.body ?? {};
+  if (typeof token !== 'string') return res.status(400).json({ error: 'Потрібно надати код' });
 
   const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+  if (!user?.twoFactorSecret) return res.status(400).json({ error: 'Спочатку згенеруйте секрет 2FA' });
   
   const isValid = authenticator.verify({ token, secret: user.twoFactorSecret });
   if (!isValid) {

@@ -34,13 +34,12 @@ model User {
   activityLogs       ActivityLog[]
 
   ownedProjects      Project[] @relation("ProjectOwner")
-  projects           Project[] @relation("ProjectMembers")
+  projects           Project[] @relation("ProjectToUser")
   tasks              Task[]
   comments           Comment[]
   files              File[]
   refreshTokens      RefreshToken[]
 
-  @@index([email])
   @@index([role])
 }
 
@@ -85,7 +84,7 @@ model Project {
   updatedAt   DateTime @updatedAt
   ownerId     Int?
   owner       User?    @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  members     User[]   @relation("ProjectMembers")
+  members     User[]   @relation("ProjectToUser")
   tasks       Task[]
 
   @@index([ownerId])

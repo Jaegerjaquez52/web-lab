@@ -5,7 +5,10 @@ export async function publish(io, room, event, payload) {
     data: { room, event, payload: JSON.stringify(payload) },
   });
 
-  io?.to(room).emit(event, { ...payload, _eventId: row.id });
+  const message = payload && typeof payload === 'object' && !Array.isArray(payload)
+    ? { ...payload, _eventId: row.id, _room: room }
+    : { payload, _eventId: row.id, _room: room };
+  io?.to(room).emit(event, message);
   return row;
 }
 
@@ -19,7 +22,11 @@ export async function eventsSince(room, afterId) {
   return rows.map((row) => ({
     id: row.id,
     event: row.event,
-    payload: JSON.parse(row.payload),
+    payload: {
+      ...JSON.parse(row.payload),
+      _eventId: row.id,
+      _room: room,
+    },
     createdAt: row.createdAt,
   }));
 }

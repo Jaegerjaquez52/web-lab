@@ -1,10 +1,32 @@
 import { Router } from 'express';
-import { uploadFile, getFile, deleteFile } from '../controllers/fileController.js';
+import { uploadFile, getFile, deleteFile, listFiles } from '../controllers/fileController.js';
 import { authenticate } from '../middleware/auth.js';
 import { upload } from '../middleware/upload.js';
 
 const router = Router();
 
+/**
+ * @swagger
+ * /api/files:
+ *   get:
+ *     summary: Список доступних файлів з пагінацією
+ *     tags: [Files]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: query
+ *         name: taskId
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, minimum: 1, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+ *     responses:
+ *       200: { description: Файли з метаданими пагінації }
+ *       403: { description: Недостатньо прав для перегляду файлів завдання }
+ */
+router.get('/', authenticate, listFiles);
 /**
  * @swagger
  * /api/files/upload:
@@ -34,6 +56,8 @@ router.post('/upload', authenticate, upload.single('file'), uploadFile);
  *   get:
  *     summary: Отримання файлу за його ідентифікатором
  *     tags: [Files]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -43,7 +67,7 @@ router.post('/upload', authenticate, upload.single('file'), uploadFile);
  *       200: { description: Успішне повернення файлу }
  *       404: { description: Файл не знайдено }
  */
-router.get('/:id', getFile);
+router.get('/:id', authenticate, getFile);
 
 /**
  * @swagger

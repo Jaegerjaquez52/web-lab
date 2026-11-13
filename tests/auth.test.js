@@ -126,7 +126,7 @@ describe('Files API', () => {
     assert.equal(big.status, 400);
     assert.equal(big.body.error, 'Файл занадто великий');
 
-    const get = await request(app).get(`/api/files/${ok.body.file.id}`);
+    const get = await request(app).get(`/api/files/${ok.body.file.id}`).set(auth);
     assert.equal(get.status, 200);
 
     const del = await request(app).delete(`/api/files/${ok.body.file.id}`).set(auth);

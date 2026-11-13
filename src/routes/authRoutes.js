@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { 
   register, login, refresh, logout,
-  forgotPassword, resetPassword,
+  forgotPassword, resetPassword, changePassword,
   generate2FA, verify2FA
 } from '../controllers/authController.js';
 import { authenticate } from '../middleware/auth.js';
@@ -138,6 +138,29 @@ router.post('/forgot-password', forgotPassword);
  *       400: { description: Недійсний токен або помилка валідації паролю }
  */
 router.post('/reset-password', resetPassword);
+
+/**
+ * @swagger
+ * /api/auth/change-password:
+ *   post:
+ *     summary: Зміна паролю поточного користувача
+ *     tags: [Authentication]
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [currentPassword, newPassword]
+ *             properties:
+ *               currentPassword: { type: string }
+ *               newPassword: { type: string, minLength: 8 }
+ *     responses:
+ *       200: { description: Пароль змінено }
+ *       401: { description: Невірний поточний пароль }
+ */
+router.post('/change-password', authenticate, changePassword);
 
 /**
  * @swagger

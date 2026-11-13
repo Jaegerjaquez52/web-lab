@@ -17,13 +17,20 @@ const userSelect = {
 };
 
 function validateIdentity({ email, name, password }, { passwordRequired }) {
-  if (!email || !email.includes('@')) return 'Вкажіть коректний email';
-  if (!name || name.trim().length < 2) return "Ім'я має містити мінімум 2 символи";
-  if (passwordRequired && (!password || password.length < 8)) {
+  if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Вкажіть коректний email';
+  if (typeof name !== 'string' || name.trim().length < 2) return "Ім'я має містити мінімум 2 символи";
+  if (passwordRequired && (typeof password !== 'string' || password.length < 8)) {
     return 'Пароль має містити мінімум 8 символів';
   }
-  if (password && password.length < 8) return 'Пароль має містити мінімум 8 символів';
+  if (password !== undefined && (typeof password !== 'string' || password.length < 8)) {
+    return 'Пароль має містити мінімум 8 символів';
+  }
   return null;
+}
+
+function parseUserId(value) {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
 }
 
 export async function getUsers(req, res) {
@@ -31,12 +38,14 @@ export async function getUsers(req, res) {
   const where = {};
 
   if (req.query.search) {
+    const search = String(req.query.search);
     where.OR = [
-      { name: { contains: req.query.search, mode: 'insensitive' } },
-      { email: { contains: req.query.search, mode: 'insensitive' } },
+      { name: { contains: search, mode: 'insensitive' } },
+      { email: { contains: search, mode: 'insensitive' } },
     ];
   }
-  if (req.query.role && ROLES.includes(req.query.role)) {
+  if (req.query.role) {
+    if (!ROLES.includes(req.query.role)) return res.status(400).json({ error: 'Невідома роль' });
     where.role = req.query.role;
   }
 
@@ -55,8 +64,10 @@ export async function getUsers(req, res) {
 }
 
 export async function getUserById(req, res) {
+  const id = parseUserId(req.params.id);
+  if (id === null) return res.status(400).json({ error: 'Некоректний ID користувача' });
   const user = await prisma.user.findUnique({
-    where: { id: Number(req.params.id) },
+    where: { id },
     select: userSelect,
   });
   if (!user) return res.status(404).json({ error: 'Користувача не знайдено' });
@@ -68,12 +79,13 @@ export async function createUser(req, res) {
   const error = validateIdentity({ email, name, password }, { passwordRequired: true });
   if (error) return res.status(400).json({ error });
   if (!ROLES.includes(role)) return res.status(400).json({ error: 'Невідома роль' });
+  const normalizedEmail = email.trim().toLowerCase();
 
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
   if (existing) return res.status(409).json({ error: 'Користувач з таким email вже існує' });
 
   const user = await prisma.user.create({
-    data: { email, name, password: await hashPassword(password), role },
+    data: { email: normalizedEmail, name: name.trim(), password: await hashPassword(password), role },
     select: userSelect,
   });
 
@@ -82,7 +94,8 @@ export async function createUser(req, res) {
 }
 
 export async function updateUser(req, res) {
-  const id = Number(req.params.id);
+  const id = parseUserId(req.params.id);
+  if (id === null) return res.status(400).json({ error: 'Некоректний ID користувача' });
   const isSelf = req.user.userId === id;
   const isAdmin = req.user.role === 'ADMIN';
   if (!isSelf && !isAdmin) {
@@ -90,21 +103,34 @@ export async function updateUser(req, res) {
   }
 
   const { email, name, password, role } = req.body ?? {};
+  const currentUser = await prisma.user.findUnique({ where: { id }, select: { id: true } });
+  if (!currentUser) return res.status(404).json({ error: 'Користувача не знайдено' });
   const error = validateIdentity({ email, name, password }, { passwordRequired: false });
   if (error) return res.status(400).json({ error });
   if (role && !isAdmin) return res.status(403).json({ error: 'Лише адміністратор змінює роль' });
   if (role && !ROLES.includes(role)) return res.status(400).json({ error: 'Невідома роль' });
+  const normalizedEmail = email.trim().toLowerCase();
+  const data = {
+    email: normalizedEmail,
+    name: name.trim(),
+    ...(role && isAdmin ? { role } : {}),
+  };
+  if (password) data.password = await hashPassword(password);
 
   try {
-    const user = await prisma.user.update({
-      where: { id },
-      data: {
-        email,
-        name,
-        ...(password ? { password: await hashPassword(password) } : {}),
-        ...(role && isAdmin ? { role } : {}),
-      },
-      select: userSelect,
+    const user = await prisma.$transaction(async (transaction) => {
+      const updatedUser = await transaction.user.update({
+        where: { id },
+        data,
+        select: userSelect,
+      });
+      if (password || (role && isAdmin)) {
+        await transaction.refreshToken.updateMany({
+          where: { userId: id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
+      return updatedUser;
     });
     logAction(req.user.userId, 'UPDATE', 'User', id);
     res.json(user);
@@ -116,7 +142,8 @@ export async function updateUser(req, res) {
 }
 
 export async function deleteUser(req, res) {
-  const id = Number(req.params.id);
+  const id = parseUserId(req.params.id);
+  if (id === null) return res.status(400).json({ error: 'Некоректний ID користувача' });
   if (req.user.userId === id) {
     return res.status(400).json({ error: 'Не можна видалити власний обліковий запис' });
   }

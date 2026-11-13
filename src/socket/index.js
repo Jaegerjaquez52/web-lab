@@ -1,10 +1,19 @@
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
+import { prisma } from '../db.js';
+import { canAccessProject, canAccessTask } from '../utils/access.js';
+import { eventsSince } from '../services/realtimeService.js';
 
-// Кеш активних користувачів
-const onlineUsers = new Set();
+const onlineUsers = new Map();
 
-// Ініціалізація WebSocket сервера
+async function canJoinRoom(user, room) {
+  const projectMatch = /^project:(\d+)$/.exec(room);
+  if (projectMatch) return canAccessProject(user, Number(projectMatch[1]));
+  const taskMatch = /^task:(\d+)$/.exec(room);
+  if (taskMatch) return (await canAccessTask(user, Number(taskMatch[1]))).allowed;
+  return false;
+}
+
 export function initSocket(httpServer) {
   const io = new Server(httpServer, {
     cors: { origin: process.env.FRONTEND_URL || 'http://localhost:5173', credentials: true },
@@ -17,39 +26,70 @@ export function initSocket(httpServer) {
       if (!token) return next(new Error('unauthorized'));
       socket.user = jwt.verify(token, process.env.JWT_SECRET);
       next();
-    } catch (error) {
+    } catch {
       next(new Error('unauthorized'));
     }
   });
 
   io.on('connection', (socket) => {
-    const userId = socket.user.userId;
-    
-    // Додавання користувача до списку активних та глобальна розсилка
-    onlineUsers.add(userId);
-    io.emit('user:online', { userId });
+    const user = socket.user;
+    const userId = user.userId;
+    const connections = onlineUsers.get(userId) ?? new Set();
+    const wasOffline = connections.size === 0;
+    connections.add(socket.id);
+    onlineUsers.set(userId, connections);
+    if (wasOffline) io.emit('user:online', { userId });
 
-    // Приєднання до персональної кімнати
     socket.join(`user:${userId}`);
 
-    // Отримання списку активних користувачів
     socket.on('users:get_online', (ack) => {
-      if (ack) ack(Array.from(onlineUsers));
+      if (ack) ack(Array.from(onlineUsers.keys()));
     });
 
-    // Приєднання до специфічної кімнати (наприклад, проєкту)
-    socket.on('room:join', (room, ack) => {
-      socket.join(room);
+    socket.on('room:join', async (room, ack) => {
+      try {
+        if (typeof room !== 'string' || !(await canJoinRoom(user, room))) {
+          if (ack) ack({ ok: false, error: 'forbidden' });
+          return;
+        }
+        await socket.join(room);
+        if (ack) ack({ ok: true });
+      } catch (error) {
+        console.error('Socket room join failed:', error);
+        if (ack) ack({ ok: false, error: 'internal_error' });
+      }
+    });
+
+    socket.on('room:leave', async (room, ack) => {
+      if (typeof room !== 'string' || !/^(project|task):\d+$/.test(room)) {
+        if (ack) ack({ ok: false, error: 'invalid_room' });
+        return;
+      }
+      await socket.leave(room);
       if (ack) ack({ ok: true });
     });
 
-    // Вихід з кімнати
-    socket.on('room:leave', (room) => socket.leave(room));
+    socket.on('events:recover', async ({ room, afterId } = {}, ack) => {
+      try {
+        if (typeof room !== 'string' || !(await canJoinRoom(user, room))) {
+          if (ack) ack({ ok: false, error: 'forbidden' });
+          return;
+        }
+        const events = await eventsSince(room, afterId);
+        if (ack) ack({ ok: true, events });
+      } catch (error) {
+        console.error('Socket event recovery failed:', error);
+        if (ack) ack({ ok: false, error: 'recovery_failed' });
+      }
+    });
 
-    // Обробка відключення клієнта
     socket.on('disconnect', () => {
-      onlineUsers.delete(userId);
-      io.emit('user:offline', { userId });
+      const activeConnections = onlineUsers.get(userId);
+      activeConnections?.delete(socket.id);
+      if (activeConnections?.size === 0) {
+        onlineUsers.delete(userId);
+        io.emit('user:offline', { userId });
+      }
     });
   });
 

@@ -7,10 +7,11 @@ import swaggerUi from 'swagger-ui-express';
 import { swaggerSpecs } from './config/swagger.js';
 import authRoutes from './routes/authRoutes.js';
 import fileRoutes from './routes/fileRoutes.js';
-import taskRoutes from './routes/taskRoutes.js'; 
+import taskRoutes from './routes/taskRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import commentRoutes from './routes/commentRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import projectRoutes from './routes/projectRoutes.js';
 
 const app = express();
 
@@ -20,7 +21,7 @@ app.use(helmet());
 // Налаштування CORS для взаємодії з клієнтською частиною
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: (process.env.FRONTEND_URL || 'http://localhost:5173').split(',').map((value) => value.trim()),
     credentials: true,
   })
 );
@@ -39,9 +40,10 @@ app.use(
 
 // Парсинг JSON-тіла запитів
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
 // Інтеграція інтерактивної документації Swagger UI
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs, { explorer: true }));
+app.use(['/api-docs', '/api/docs'], swaggerUi.serve, swaggerUi.setup(swaggerSpecs, { explorer: true }));
 
 // Реєстрація API маршрутів
 app.use('/api/auth', authRoutes);
@@ -50,6 +52,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/projects', projectRoutes);
 
 // Централізована обробка помилок
 app.use((err, req, res, next) => {

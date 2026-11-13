@@ -36,7 +36,6 @@ GitHub репозиторій: [\[посилання\]](https://github.com/Jaege
 
 ```
 export async function refresh(req, res) {
-  // ... (валідація токена)
   const stored = await prisma.refreshToken.findUnique({
     where: { tokenHash: sha256(refreshToken) },
     include: { user: true },

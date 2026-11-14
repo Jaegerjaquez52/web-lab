@@ -56,9 +56,14 @@ export async function getTasks(req, res) {
     search,
     status,
     projectId,
+    assignedToMe,
     sortBy = 'createdAt',
     order = 'desc',
   } = req.query;
+
+  if (assignedToMe !== undefined && !['true', 'false'].includes(String(assignedToMe))) {
+    return res.status(400).json({ error: 'Параметр assignedToMe має бути true або false' });
+  }
 
   const { pageNumber, take, skip, orderField, orderDirection } = parseListQuery(
     { page, limit, sortBy, order },
@@ -76,6 +81,9 @@ export async function getTasks(req, res) {
   if (status) {
     if (!['TODO', 'IN_PROGRESS', 'DONE'].includes(String(status))) {
       return res.status(400).json({ error: 'Невідомий статус завдання' });
+    }
+    if (assignedToMe === 'true') {
+      filters.push({ assignments: { some: { userId: req.user.userId } } });
     }
     filters.push({ status: String(status) });
   }

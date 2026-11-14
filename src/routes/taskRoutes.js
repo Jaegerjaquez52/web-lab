@@ -34,6 +34,10 @@ router.use(authenticate);
  *       - in: query
  *         name: search
  *         schema: { type: string }
+ *       - in: query
+ *         name: assignedToMe
+ *         description: Повернути лише завдання, де поточний користувач є виконавцем
+ *         schema: { type: boolean }
  *     responses:
  *       200: { description: Завдання доступних проєктів }
  *       401: { description: Потрібна автентифікація }

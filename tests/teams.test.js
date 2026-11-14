@@ -129,6 +129,20 @@ test('project tasks can be claimed by multiple members, but only by their team',
   let assignments = await prisma.taskAssignment.findMany({ where: { taskId: task.id } });
   assert.deepEqual(new Set(assignments.map((assignment) => assignment.userId)), new Set([owner.id, member.id]));
 
+  for (const [token, expectedCount] of [[ownerToken, 1], [memberToken, 1], [outsiderToken, 0]]) {
+    const assignedTasks = await request(app)
+      .get('/api/tasks?assignedToMe=true')
+      .set(auth(token));
+    assert.equal(assignedTasks.status, 200);
+    assert.equal(assignedTasks.body.pagination.total, expectedCount);
+    if (expectedCount) assert.ok(assignedTasks.body.data.some((item) => item.id === task.id));
+  }
+
+  const invalidAssignedFilter = await request(app)
+    .get('/api/tasks?assignedToMe=yes')
+    .set(auth(ownerToken));
+  assert.equal(invalidAssignedFilter.status, 400);
+
   const rejected = await request(app)
     .put(`/api/tasks/${task.id}/claim`)
     .set(auth(outsiderToken))

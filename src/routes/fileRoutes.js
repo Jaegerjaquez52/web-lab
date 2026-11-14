@@ -42,7 +42,10 @@ router.get('/', authenticate, listFiles);
  *           schema:
  *             type: object
  *             properties:
- *               file: { type: string, format: binary }
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: JPG, PNG, GIF, or PDF (maximum 5 MB by default)
  *     responses:
  *       201: { description: Файл успішно завантажено }
  *       400: { description: Помилка завантаження або непідтримуваний тип файлу }

@@ -12,6 +12,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import commentRoutes from './routes/commentRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import projectRoutes from './routes/projectRoutes.js';
+import teamRoutes from './routes/teamRoutes.js';
 
 const app = express();
 
@@ -52,6 +53,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/teams', teamRoutes);
 app.use('/api/projects', projectRoutes);
 
 // Централізована обробка помилок

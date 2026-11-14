@@ -17,7 +17,9 @@ export async function listFiles(req, res) {
   const { pageNumber, take, skip } = parseListQuery(req.query, ['createdAt']);
   const where = {
     ...(taskId === undefined ? {} : { taskId }),
-    ...(req.user.role === 'ADMIN' || taskId !== undefined ? {} : { uploadedBy: req.user.userId }),
+    ...(req.user.role === 'ADMIN' || taskId !== undefined
+      ? {}
+      : { taskId: null, uploadedBy: req.user.userId }),
   };
   const [data, total] = await Promise.all([
     prisma.file.findMany({
@@ -94,6 +96,9 @@ export async function deleteFile(req, res) {
     return res.status(404).json({ error: 'Файл не знайдено' });
   }
 
+  if (!(await canAccessFile(req.user, file))) {
+    return res.status(403).json({ error: 'Недостатньо прав для видалення цього файлу' });
+  }
   if (req.user.role !== 'ADMIN' && file.uploadedBy !== req.user.userId) {
     return res.status(403).json({ error: 'Ви не маєте прав для видалення цього файлу' });
   }

@@ -30,3 +30,14 @@ export async function eventsSince(room, afterId) {
     createdAt: row.createdAt,
   }));
 }
+
+export async function removeUsersFromProjectRooms(io, userIds, projectIds) {
+  if (!io || !userIds.length || !projectIds.length) return;
+
+  await Promise.all(userIds.map(async (userId) => {
+    const sockets = await io.in(`user:${userId}`).fetchSockets();
+    await Promise.all(sockets.flatMap((socket) => projectIds.map((projectId) => (
+      socket.leave(`project:${projectId}`)
+    ))));
+  }));
+}

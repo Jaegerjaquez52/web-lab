@@ -7,6 +7,8 @@ test('Swagger includes documented CRUD routes for core entities', () => {
   assert.ok(paths['/api/tasks']?.get);
   assert.ok(paths['/api/tasks/{id}']?.patch);
   assert.ok(paths['/api/tasks/{id}']?.delete);
+  assert.ok(paths['/api/tasks/{id}/claim']?.put);
+  assert.ok(paths['/api/teams']?.post);
   assert.ok(paths['/api/projects']?.post);
   assert.ok(paths['/api/files']?.get);
   assert.ok(paths['/api/comments/{id}']?.delete);

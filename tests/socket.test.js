@@ -18,6 +18,7 @@ const testEmail = (userId) => `socket-test-${userId}@example.com`;
 let alice;
 let bob;
 let outsider;
+let team;
 let project;
 let task;
 
@@ -32,11 +33,21 @@ before(async () => {
   outsider = await prisma.user.create({
     data: { email: testEmail(3), name: 'Socket Outsider', password: 'test-password' },
   });
+  team = await prisma.team.create({
+    data: {
+      name: 'Socket test team',
+      ownerId: alice.id,
+      members: { connect: { id: bob.id } },
+    },
+  });
   project = await prisma.project.create({
-    data: { name: 'Socket test project', ownerId: alice.id, members: { connect: { id: bob.id } } },
+    data: { name: 'Socket test project', ownerId: alice.id, teamId: team.id },
   });
   task = await prisma.task.create({
-    data: { title: 'Socket test task', projectId: project.id, assigneeId: bob.id },
+    data: { title: 'Socket test task', projectId: project.id },
+  });
+  await prisma.taskAssignment.create({
+    data: { taskId: task.id, userId: bob.id },
   });
 });
 
@@ -57,6 +68,7 @@ after(async () => {
     await prisma.task.deleteMany({ where: { projectId: project.id } });
     await prisma.project.deleteMany({ where: { id: project.id } });
   }
+  if (team) await prisma.team.deleteMany({ where: { id: team.id } });
   if (alice && bob && outsider) {
     await prisma.user.deleteMany({ where: { id: { in: [alice.id, bob.id, outsider.id] } } });
   }

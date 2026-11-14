@@ -9,7 +9,7 @@ router.use(authenticate);
  * @swagger
  * tags:
  *   name: Projects
- *   description: Проєкти та їх учасники
+ *   description: Проєкти та команди
  */
 /**
  * @swagger
@@ -44,7 +44,7 @@ router.use(authenticate);
  *             properties:
  *               name: { type: string }
  *               description: { type: string }
- *               memberIds: { type: array, items: { type: integer } }
+ *               teamId: { type: integer, nullable: true }
  *     responses:
  *       201: { description: Проєкт створено }
  *       400: { description: Некоректні дані }
@@ -84,7 +84,7 @@ router.post('/', createProject);
  *             properties:
  *               name: { type: string }
  *               description: { type: string }
- *               memberIds: { type: array, items: { type: integer } }
+ *               teamId: { type: integer, nullable: true }
  *     responses:
  *       200: { description: Проєкт оновлено }
  *   delete:

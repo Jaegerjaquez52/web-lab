@@ -41,13 +41,23 @@ export async function addComment(req, res) {
     data: { text: text.trim(), taskId, userId },
     include: { user: { select: { id: true, name: true, email: true } } },
   });
-  const task = await prisma.task.findUnique({ where: { id: taskId } });
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    include: { assignments: { select: { userId: true } } },
+  });
 
   if (task?.projectId) {
     await publish(req.app.get('io'), `project:${task.projectId}`, 'comment:created', comment);
   }
-  if (task?.assigneeId && task.assigneeId !== userId) {
-    await createNotification(req.app.get('io'), task.assigneeId, `Новий коментар до завдання "${task.title}"`, 'COMMENT_ADDED');
+  if (task) {
+    await Promise.all(task.assignments
+      .filter(({ userId: assigneeId }) => assigneeId !== userId)
+      .map(({ userId: assigneeId }) => createNotification(
+        req.app.get('io'),
+        assigneeId,
+        `Новий коментар до завдання "${task.title}"`,
+        'COMMENT_ADDED',
+      )));
   }
 
   res.status(201).json(comment);

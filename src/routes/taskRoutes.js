@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
-import { getTasks, getTaskById, createTask, updateTask, deleteTask } from '../controllers/taskController.js';
+import { createTask, deleteTask, getTaskById, getTasks, setTaskClaim, updateTask } from '../controllers/taskController.js';
 
 const router = Router();
+router.use(authenticate);
 
 /**
  * @swagger
@@ -10,13 +11,13 @@ const router = Router();
  *   name: Tasks
  *   description: Управління завданнями
  */
-
 /**
  * @swagger
  * /api/tasks:
  *   get:
- *     summary: Отримання списку завдань (з пагінацією, пошуком та фільтрацією)
+ *     summary: Список доступних завдань з пошуком, фільтрацією та пагінацією
  *     tags: [Tasks]
+ *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - in: query
  *         name: page
@@ -33,16 +34,13 @@ const router = Router();
  *       - in: query
  *         name: search
  *         schema: { type: string }
- *     security: [{ bearerAuth: [] }]
  *     responses:
- *       200:
- *         description: Список завдань з пагінацією
+ *       200: { description: Завдання доступних проєктів }
  *       401: { description: Потрібна автентифікація }
  *   post:
- *     summary: Створення нового завдання
+ *     summary: Створення завдання у доступному проєкті
  *     tags: [Tasks]
- *     security:
- *       - bearerAuth: []
+ *     security: [{ bearerAuth: [] }]
  *     requestBody:
  *       required: true
  *       content:
@@ -51,15 +49,16 @@ const router = Router();
  *             type: object
  *             required: [title, projectId]
  *             properties:
- *               title: { type: string, example: "Розробити WebSocket модуль" }
- *               description: { type: string, example: "Інтегрувати Socket.io та сповіщення" }
- *               status: { type: string, enum: [TODO, IN_PROGRESS, DONE], example: "TODO" }
- *               projectId: { type: integer, example: 1 }
+ *               title: { type: string }
+ *               description: { type: string }
+ *               status: { type: string, enum: [TODO, IN_PROGRESS, DONE] }
+ *               projectId: { type: integer }
  *     responses:
- *       201: { description: Завдання успішно створено }
- *       400: { description: Некоректні дані }
- *       401: { description: Потрібна автентифікація }
+ *       201: { description: Завдання створено }
+ *       403: { description: Немає доступу до проєкту }
  */
+router.get('/', getTasks);
+router.post('/', createTask);
 
 /**
  * @swagger
@@ -67,8 +66,7 @@ const router = Router();
  *   get:
  *     summary: Отримання завдання за ідентифікатором
  *     tags: [Tasks]
- *     security:
- *       - bearerAuth: []
+ *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - in: path
  *         name: id
@@ -76,12 +74,12 @@ const router = Router();
  *         schema: { type: integer }
  *     responses:
  *       200: { description: Завдання знайдено }
+ *       403: { description: Недостатньо прав }
  *       404: { description: Завдання не знайдено }
  *   patch:
- *     summary: Оновлення завдання (та відправка WebSocket-сповіщення)
+ *     summary: Оновлення назви, опису чи статусу завдання
  *     tags: [Tasks]
- *     security:
- *       - bearerAuth: []
+ *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - in: path
  *         name: id
@@ -94,18 +92,16 @@ const router = Router();
  *           schema:
  *             type: object
  *             properties:
- *               title: { type: string, example: "Оновлена назва задачі" }
- *               status: { type: string, example: "DONE" }
- *               assigneeId: { type: integer, example: 1 }
+ *               title: { type: string }
+ *               description: { type: string, nullable: true }
+ *               status: { type: string, enum: [TODO, IN_PROGRESS, DONE] }
  *     responses:
  *       200: { description: Завдання оновлено }
- *       400: { description: Некоректні дані }
- *       401: { description: Потрібна автентифікація }
+ *       403: { description: Недостатньо прав }
  *   delete:
  *     summary: Видалення завдання
  *     tags: [Tasks]
- *     security:
- *       - bearerAuth: []
+ *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - in: path
  *         name: id
@@ -113,18 +109,37 @@ const router = Router();
  *         schema: { type: integer }
  *     responses:
  *       204: { description: Завдання видалено }
- *       401: { description: Потрібна автентифікація }
+ *       403: { description: Недостатньо прав }
  */
+router.get('/:id', getTaskById);
+router.patch('/:id', updateTask);
+router.delete('/:id', deleteTask);
 
-// Отримання списку завдань (підтримує пагінацію, фільтрацію та пошук)
-router.get('/', authenticate, getTasks);
-router.get('/:id', authenticate, getTaskById);
-
-// Створення нового завдання
-router.post('/', authenticate, createTask);
-
-// Часткове оновлення існуючого завдання
-router.patch('/:id', authenticate, updateTask);
-router.delete('/:id', authenticate, deleteTask);
+/**
+ * @swagger
+ * /api/tasks/{id}/claim:
+ *   put:
+ *     summary: Позначити або зняти себе як виконавця завдання
+ *     tags: [Tasks]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [claimed]
+ *             properties:
+ *               claimed: { type: boolean }
+ *     responses:
+ *       200: { description: Виконавців оновлено }
+ *       403: { description: Користувач не є учасником команди проєкту }
+ */
+router.put('/:id/claim', setTaskClaim);
 
 export default router;

@@ -57,6 +57,7 @@ router.use(authenticate);
  *               description: { type: string }
  *               status: { type: string, enum: [TODO, IN_PROGRESS, DONE] }
  *               projectId: { type: integer }
+ *               dueDate: { type: string, format: date, nullable: true }
  *     responses:
  *       201: { description: Завдання створено }
  *       403: { description: Немає доступу до проєкту }
@@ -81,7 +82,7 @@ router.post('/', createTask);
  *       403: { description: Недостатньо прав }
  *       404: { description: Завдання не знайдено }
  *   patch:
- *     summary: Оновлення назви, опису чи статусу завдання
+ *     summary: Оновлення назви, опису, статусу чи терміну виконання завдання
  *     tags: [Tasks]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -99,6 +100,7 @@ router.post('/', createTask);
  *               title: { type: string }
  *               description: { type: string, nullable: true }
  *               status: { type: string, enum: [TODO, IN_PROGRESS, DONE] }
+ *               dueDate: { type: string, format: date, nullable: true }
  *     responses:
  *       200: { description: Завдання оновлено }
  *       403: { description: Недостатньо прав }

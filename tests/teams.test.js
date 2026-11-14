@@ -118,6 +118,28 @@ test('projects and tasks are visible only to owners and team members', async () 
   assert.ok(adminProjects.body.data.some((item) => item.id === project.id));
 });
 
+test('tasks accept, validate, and clear a due date', async () => {
+  const created = await request(app)
+    .post('/api/tasks')
+    .set(auth(ownerToken))
+    .send({ title: 'Deadline task', projectId: project.id, dueDate: '2026-11-20' });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.dueDate.slice(0, 10), '2026-11-20');
+
+  const invalidDate = await request(app)
+    .patch(`/api/tasks/${created.body.id}`)
+    .set(auth(ownerToken))
+    .send({ dueDate: '2026-02-30' });
+  assert.equal(invalidDate.status, 400);
+
+  const cleared = await request(app)
+    .patch(`/api/tasks/${created.body.id}`)
+    .set(auth(ownerToken))
+    .send({ dueDate: null });
+  assert.equal(cleared.status, 200);
+  assert.equal(cleared.body.dueDate, null);
+});
+
 test('project tasks can be claimed by multiple members, but only by their team', async () => {
   for (const token of [ownerToken, memberToken]) {
     const response = await request(app)

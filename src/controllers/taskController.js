@@ -25,6 +25,18 @@ const taskInclude = {
   assignments: { include: { user: { select: personSelect } }, orderBy: { createdAt: 'asc' } },
 };
 
+function parseDueDate(value) {
+  if (value === null) return { valid: true, date: null };
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return { valid: false };
+  }
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+    return { valid: false };
+  }
+  return { valid: true, date };
+}
+
 function taskVisibility(user) {
   if (user.role === 'ADMIN') return {};
   return {
@@ -134,7 +146,7 @@ export async function getTaskById(req, res) {
 }
 
 export async function createTask(req, res) {
-  const { title, description, projectId, status = 'TODO' } = req.body ?? {};
+  const { title, description, projectId, status = 'TODO', dueDate } = req.body ?? {};
   const projectNumber = Number(projectId);
   if (typeof title !== 'string' || !title.trim() || !Number.isInteger(projectNumber) || projectNumber < 1) {
     return res.status(400).json({ error: 'Коректні назва та ID проєкту є обов’язковими' });
@@ -144,6 +156,10 @@ export async function createTask(req, res) {
   }
   if (!['TODO', 'IN_PROGRESS', 'DONE'].includes(status)) {
     return res.status(400).json({ error: 'Невідомий статус завдання' });
+  }
+  const parsedDueDate = dueDate === undefined ? undefined : parseDueDate(dueDate);
+  if (parsedDueDate && !parsedDueDate.valid) {
+    return res.status(400).json({ error: 'Термін виконання має бути коректною датою у форматі YYYY-MM-DD' });
   }
   const projectExists = await prisma.project.findUnique({ where: { id: projectNumber }, select: { id: true } });
   if (!projectExists) return res.status(404).json({ error: 'Проєкт не знайдено' });
@@ -157,6 +173,7 @@ export async function createTask(req, res) {
       description: description?.trim() || null,
       status,
       projectId: projectNumber,
+      ...(parsedDueDate && { dueDate: parsedDueDate.date }),
     },
     include: taskInclude,
   });
@@ -176,7 +193,7 @@ export async function updateTask(req, res) {
     return res.status(403).json({ error: 'Недостатньо прав для оновлення завдання' });
   }
 
-  const { title, description, status } = req.body ?? {};
+  const { title, description, status, dueDate } = req.body ?? {};
   const data = {};
   if (title !== undefined) {
     if (typeof title !== 'string' || !title.trim()) return res.status(400).json({ error: 'Назва не може бути порожньою' });
@@ -191,6 +208,13 @@ export async function updateTask(req, res) {
   if (status !== undefined) {
     if (!['TODO', 'IN_PROGRESS', 'DONE'].includes(status)) return res.status(400).json({ error: 'Невідомий статус завдання' });
     data.status = status;
+  }
+  if (dueDate !== undefined) {
+    const parsedDueDate = parseDueDate(dueDate);
+    if (!parsedDueDate.valid) {
+      return res.status(400).json({ error: 'Термін виконання має бути коректною датою у форматі YYYY-MM-DD' });
+    }
+    data.dueDate = parsedDueDate.date;
   }
   if (!Object.keys(data).length) return res.status(400).json({ error: 'Не передано полів для оновлення' });
 

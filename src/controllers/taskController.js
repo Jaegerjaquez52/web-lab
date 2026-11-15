@@ -82,6 +82,9 @@ export async function getTasks(req, res) {
     SORTABLE_FIELDS
   );
   const filters = [];
+  if (assignedToMe === 'true') {
+    filters.push({ assignments: { some: { userId: req.user.userId } } });
+  }
   if (search) {
     filters.push({
       OR: [
@@ -93,9 +96,6 @@ export async function getTasks(req, res) {
   if (status) {
     if (!['TODO', 'IN_PROGRESS', 'DONE'].includes(String(status))) {
       return res.status(400).json({ error: 'Невідомий статус завдання' });
-    }
-    if (assignedToMe === 'true') {
-      filters.push({ assignments: { some: { userId: req.user.userId } } });
     }
     filters.push({ status: String(status) });
   }

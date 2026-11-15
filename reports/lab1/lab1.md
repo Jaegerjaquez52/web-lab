@@ -51,8 +51,8 @@ _lab/
 │   └── schema.prisma
 ├── reports/
 │   └── lab1/
-│       ├──screenshots/
-│       └──lab1.md
+│       ├── screenshots/
+│       └── lab1.md
 ├── src/
 │   ├── controllers/
 │   │   └── userController.js
@@ -64,7 +64,7 @@ _lab/
 │   │   ├── prisma.js
 │   │   └── validation.js
 │   └── app.js
-├── .env
+├── .env.example
 ├── .gitignore
 ├── package-lock.json
 ├── package.json
@@ -73,28 +73,28 @@ _lab/
 
 ## Скріншоти тестування
 
-### POST 
+### POST
 
-![alt text](screenshots/01-POST.png)
+![Створення користувача](screenshots/01-POST.png)
 
-![alt text](screenshots/02-POST.png)
+![Відповідь API під час створення користувача](screenshots/02-POST.png)
 
-### GET 
+### GET
 
-![alt text](screenshots/03-GET_all.png)
+![Отримання списку користувачів](screenshots/03-GET_all.png)
 
-![alt text](screenshots/04-GET_one.png)
+![Отримання користувача за ID](screenshots/04-GET_one.png)
 
 ### UPDATE 
 
-![alt text](screenshots/05-UPDATE.png)
+![Оновлення користувача](screenshots/05-UPDATE.png)
 
 ### DELETE 
 
-![alt text](screenshots/06-DELETE.png)
+![Видалення користувача](screenshots/06-DELETE.png)
 
 ## Висновки
 
-Самооцінка: 5
+**Самооцінка: 5**
 
-Обгрунтування: було успішно розроблено базову серверну частину  для системи управління завданнями, тестування запитів успішне, валідація працює. Структура проекту охайна, а код написайний з дотриманням всіх вимог чистого коду.
+**Обґрунтування:** Розроблено базову серверну частину системи управління завданнями. CRUD-запити та валідацію перевірено успішно; структура проєкту організована за MVC.
